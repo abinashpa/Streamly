@@ -1,0 +1,75 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model UserPreference {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  theme          String   @default("dark")
+  autoplay       Boolean  @default(true)
+  playbackSpeed  Float    @default(1.0)
+  volumeLevel    Float    @default(0.8)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model WatchHistory {
+  id          String   @id @default(uuid())
+  userId      String
+  mediaId     String
+  mediaType   String   // video, short, music
+  title       String
+  thumbnailUrl String?
+  progress    Float    @default(0) // seconds watched
+  completed   Boolean  @default(false)
+  watchedAt   DateTime @default(now())
+
+  @@index([userId, watchedAt])
+}
+
+model Playlist {
+  id          String         @id @default(uuid())
+  userId      String
+  name        String
+  description String?
+  isPublic    Boolean        @default(true)
+  items       PlaylistItem[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([userId])
+}
+
+model PlaylistItem {
+  id          String   @id @default(uuid())
+  playlistId  String
+  playlist    Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  mediaId     String
+  mediaType   String
+  title       String
+  artist      String?
+  thumbnailUrl String?
+  streamUrl   String
+  duration    Float    @default(0)
+  position    Int      @default(0)
+  addedAt     DateTime @default(now())
+
+  @@index([playlistId, position])
+}
+
+model SavedMedia {
+  id          String   @id @default(uuid())
+  userId      String
+  mediaId     String
+  mediaType   String
+  title       String
+  thumbnailUrl String?
+  savedAt     DateTime @default(now())
+
+  @@unique([userId, mediaId])
+}

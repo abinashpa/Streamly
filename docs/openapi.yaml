@@ -1,0 +1,459 @@
+openapi: 3.0.3
+info:
+  title: Streamly Microservices API
+  description: |
+    Comprehensive interactive API documentation for Streamly — a high-performance streaming microservice platform for Videos, Shorts, and Music.
+
+    ### Tech Stack
+    * **Frontend:** Next.js 14, TypeScript, TailwindCSS, Prisma
+    * **Backend:** Go (Golang), Gin Framework, GORM, PostgreSQL
+    * **Caching:** Redis
+    * **Search Engine:** OpenSearch with Edge N-Gram Autocomplete
+    * **Streaming:** RFC 7233 HTTP 206 Partial Content (Byte Range Requests)
+  version: 1.0.0
+  contact:
+    name: Streamly Engineering
+    url: https://github.com/streamly
+
+servers:
+  - url: http://localhost:8080
+    description: API Gateway (Unified Microservices Proxy)
+  - url: http://localhost:8081
+    description: Media Service (Direct)
+  - url: http://localhost:8082
+    description: Catalog Service (Direct)
+  - url: http://localhost:8083
+    description: Search Service (Direct)
+  - url: http://localhost:8084
+    description: User Service (Direct)
+
+tags:
+  - name: Media Service
+    description: Media file uploads, HTTP 206 Range streaming, and thumbnail handling
+  - name: Catalog Service
+    description: Feed listings, trending rankings, views, likes, and comment threads
+  - name: Search Service
+    description: OpenSearch full-text queries, prefix autocomplete suggestions, and index management
+  - name: Authentication & Users
+    description: User registration, JWT login, and profile channel management
+  - name: System
+    description: Health check endpoints
+
+paths:
+  /health:
+    get:
+      tags: [System]
+      summary: System Health Check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: api-gateway
+
+  /api/v1/media/upload:
+    post:
+      tags: [Media Service]
+      summary: Upload Video, Short, or Music Track
+      description: Handles multipart file uploads up to 500MB with optional thumbnail.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, title]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                thumbnail:
+                  type: string
+                  format: binary
+                title:
+                  type: string
+                  example: Cyberpunk Neon Tokyo Night Walk
+                media_type:
+                  type: string
+                  enum: [video, short, music]
+                  default: video
+                description:
+                  type: string
+                artist:
+                  type: string
+                duration:
+                  type: number
+                  format: float
+                tags:
+                  type: string
+                uploader_name:
+                  type: string
+      responses:
+        '201':
+          description: Media uploaded successfully
+        '400':
+          description: Invalid file format or missing parameters
+
+  /api/v1/media:
+    get:
+      tags: [Media Service]
+      summary: List Uploaded Media Records
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [video, short, music]
+        - name: uploader_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of media records
+
+  /api/v1/media/{id}:
+    get:
+      tags: [Media Service]
+      summary: Get Media Metadata by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Media item found
+        '404':
+          description: Media not found
+    delete:
+      tags: [Media Service]
+      summary: Delete Media Record and File
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Media deleted
+
+  /api/v1/media/stream/{id}:
+    get:
+      tags: [Media Service]
+      summary: Stream Video or Audio (HTTP 206 Partial Content)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Range
+          in: header
+          schema:
+            type: string
+            example: bytes=0-1048576
+      responses:
+        '200':
+          description: Full content stream
+        '206':
+          description: Partial content chunk returned
+
+  /api/v1/media/stream/{id}/thumbnail:
+    get:
+      tags: [Media Service]
+      summary: Serve Media Thumbnail or Artwork
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Thumbnail image stream
+
+  /api/v1/catalog/feed:
+    get:
+      tags: [Catalog Service]
+      summary: Get Media Feed (Redis Cached)
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [all, video, short, music]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated feed items
+
+  /api/v1/catalog/trending:
+    get:
+      tags: [Catalog Service]
+      summary: Get Trending Media (Redis Cached)
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [all, video, short, music]
+      responses:
+        '200':
+          description: Ranked trending media list
+
+  /api/v1/catalog/media/{id}:
+    get:
+      tags: [Catalog Service]
+      summary: Get Catalog Item Details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Catalog item found
+
+  /api/v1/catalog/media/{id}/view:
+    post:
+      tags: [Catalog Service]
+      summary: Increment View Count
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: View recorded in Redis and PostgreSQL
+
+  /api/v1/catalog/media/{id}/like:
+    post:
+      tags: [Catalog Service]
+      summary: Toggle Like / Unlike
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  type: string
+      responses:
+        '200':
+          description: Like toggled
+
+  /api/v1/catalog/media/{id}/comments:
+    get:
+      tags: [Catalog Service]
+      summary: Get Comments for Media
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Comments list
+    post:
+      tags: [Catalog Service]
+      summary: Post a Comment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                user_name:
+                  type: string
+      responses:
+        '201':
+          description: Comment posted
+
+  /api/v1/search:
+    get:
+      tags: [Search Service]
+      summary: Search Media via OpenSearch
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [all, video, short, music]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: OpenSearch search results
+
+  /api/v1/search/suggest:
+    get:
+      tags: [Search Service]
+      summary: Autocomplete Suggestions
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 6
+      responses:
+        '200':
+          description: Suggestion terms list
+
+  /api/v1/search/index:
+    post:
+      tags: [Search Service]
+      summary: Index Media Document in OpenSearch
+      responses:
+        '200':
+          description: Document indexed
+
+  /api/v1/search/reindex:
+    post:
+      tags: [Search Service]
+      summary: Reindex All Media
+      responses:
+        '200':
+          description: Reindexing complete
+
+  /api/v1/auth/register:
+    post:
+      tags: [Authentication & Users]
+      summary: Register New User Account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password]
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+                display_name:
+                  type: string
+      responses:
+        '201':
+          description: User registered with JWT token
+
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication & Users]
+      summary: User Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username_or_email, password]
+              properties:
+                username_or_email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful with JWT token
+
+  /api/v1/users/{id}:
+    get:
+      tags: [Authentication & Users]
+      summary: Get Public Channel Profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Channel profile details
+
+  /api/v1/users/me:
+    get:
+      tags: [Authentication & Users]
+      summary: Get Authenticated User Profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+    put:
+      tags: [Authentication & Users]
+      summary: Update Profile Details
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profile updated
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

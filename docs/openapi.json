@@ -1,0 +1,864 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Streamly Microservices API",
+    "description": "Comprehensive interactive API documentation for Streamly — a high-performance streaming microservice platform for Videos, Shorts, and Music.\n\n### Tech Stack\n* **Frontend:** Next.js 14, TypeScript, TailwindCSS, Prisma\n* **Backend:** Go (Golang), Gin Framework, GORM, PostgreSQL\n* **Caching:** Redis\n* **Search Engine:** OpenSearch with Edge N-Gram Autocomplete\n* **Streaming:** RFC 7233 HTTP 206 Partial Content (Byte Range Requests)",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Streamly Engineering",
+      "url": "https://github.com/streamly"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "API Gateway (Unified Microservices Proxy)"
+    },
+    {
+      "url": "http://localhost:8081",
+      "description": "Media Service (Direct)"
+    },
+    {
+      "url": "http://localhost:8082",
+      "description": "Catalog Service (Direct)"
+    },
+    {
+      "url": "http://localhost:8083",
+      "description": "Search Service (Direct)"
+    },
+    {
+      "url": "http://localhost:8084",
+      "description": "User Service (Direct)"
+    },
+    {
+      "url": "http://localhost:8085",
+      "description": "GraphQL Service (Direct & Playground)"
+    }
+  ],
+  "tags": [
+    {
+      "name": "GraphQL API",
+      "description": "Unified GraphQL queries, nested resolvers, mutations, and playground"
+    },
+    {
+      "name": "Media Service",
+      "description": "Media file uploads, HTTP 206 Range streaming, and thumbnail handling"
+    },
+    {
+      "name": "Catalog Service",
+      "description": "Feed listings, trending rankings, views, likes, and comment threads"
+    },
+    {
+      "name": "Search Service",
+      "description": "OpenSearch full-text queries, prefix autocomplete suggestions, and index management"
+    },
+    {
+      "name": "Authentication & Users",
+      "description": "User registration, JWT login, and profile channel management"
+    },
+    {
+      "name": "System",
+      "description": "Health check endpoints"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "System Health Check",
+        "description": "Returns operational status and backend connectivity information.",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "service": { "type": "string", "example": "api-gateway" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/graphql": {
+      "get": {
+        "tags": ["GraphQL API"],
+        "summary": "Interactive GraphQL Playground IDE",
+        "description": "Serves the browser GraphQL Playground interface for testing queries and mutations.",
+        "responses": {
+          "200": {
+            "description": "HTML page with interactive GraphQL Playground IDE"
+          }
+        }
+      },
+      "post": {
+        "tags": ["GraphQL API"],
+        "summary": "Execute GraphQL Query or Mutation",
+        "description": "Unified GraphQL endpoint to execute queries (feed, trending, media, search, suggestions, user, me) and mutations (recordView, toggleLike, addComment).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                  "query": { "type": "string", "example": "query { feed(type: ALL) { id title views } }" },
+                  "operationName": { "type": "string" },
+                  "variables": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "GraphQL result payload containing data and optional errors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "type": "object" },
+                    "errors": { "type": "array", "items": { "type": "object" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/upload": {
+      "post": {
+        "tags": ["Media Service"],
+        "summary": "Upload Video, Short, or Music Track",
+        "description": "Handles multipart form file uploads up to 500MB with optional custom thumbnail image. Asynchronously registers the media with OpenSearch and invalidates the Redis feed cache.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file", "title"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Media file (MP4, WebM, MOV, MP3, WAV, FLAC, OGG)"
+                  },
+                  "thumbnail": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Optional custom thumbnail or album artwork (JPG, PNG, WebP)"
+                  },
+                  "title": {
+                    "type": "string",
+                    "example": "Cyberpunk Neon Tokyo Night Walk"
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "enum": ["video", "short", "music"],
+                    "default": "video"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "Rainy neon vibes in Shinjuku alleys with retro synth sound."
+                  },
+                  "artist": {
+                    "type": "string",
+                    "example": "SynthWave 1984"
+                  },
+                  "duration": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "Duration in seconds",
+                    "example": 180
+                  },
+                  "tags": {
+                    "type": "string",
+                    "example": "neon,tokyo,synthwave,aesthetic"
+                  },
+                  "uploader_name": {
+                    "type": "string",
+                    "example": "NeonTraveler"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Media uploaded and recorded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Media uploaded successfully" },
+                    "media": { "$ref": "#/components/schemas/Media" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid file format or missing parameters" },
+          "500": { "description": "Storage or database error" }
+        }
+      }
+    },
+    "/api/v1/media": {
+      "get": {
+        "tags": ["Media Service"],
+        "summary": "List Uploaded Media Records",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["video", "short", "music"] },
+            "description": "Filter by media type"
+          },
+          {
+            "name": "uploader_id",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter by uploader UUID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of media records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer", "example": 12 },
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Media" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/{id}": {
+      "get": {
+        "tags": ["Media Service"],
+        "summary": "Get Media Metadata by ID",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Media" } }
+            }
+          },
+          "404": { "description": "Media not found" }
+        }
+      },
+      "delete": {
+        "tags": ["Media Service"],
+        "summary": "Delete Media Record and Physical File",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Media deleted successfully" },
+          "404": { "description": "Media not found" }
+        }
+      }
+    },
+    "/api/v1/media/stream/{id}": {
+      "get": {
+        "tags": ["Media Service"],
+        "summary": "Stream Video or Audio (HTTP 206 Partial Content)",
+        "description": "Serves chunked media streams supporting RFC 7233 byte range requests (`Range: bytes=start-end`). Enables instant seeking and scrubbing in video/audio players.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": { "type": "string", "example": "bytes=0-1048576" },
+            "description": "Standard HTTP Range header requesting specific byte chunk"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Full file stream returned" },
+          "206": {
+            "description": "Partial content chunk returned",
+            "headers": {
+              "Content-Range": {
+                "schema": { "type": "string", "example": "bytes 0-1048575/10485760" }
+              },
+              "Accept-Ranges": {
+                "schema": { "type": "string", "example": "bytes" }
+              }
+            }
+          },
+          "404": { "description": "Media file not found" }
+        }
+      }
+    },
+    "/api/v1/media/stream/{id}/thumbnail": {
+      "get": {
+        "tags": ["Media Service"],
+        "summary": "Serve Media Thumbnail or Artwork",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Thumbnail image stream (JPEG/PNG/WebP)" },
+          "307": { "description": "Redirected to fallback seed artwork" }
+        }
+      }
+    },
+    "/api/v1/catalog/feed": {
+      "get": {
+        "tags": ["Catalog Service"],
+        "summary": "Get Media Feed (Redis Cached)",
+        "description": "Returns paginated media feed items ordered by creation time. Results are cached in Redis with a 45-second TTL.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["all", "video", "short", "music"] }
+          },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "source": { "type": "string", "example": "cache" },
+                    "page": { "type": "integer", "example": 1 },
+                    "limit": { "type": "integer", "example": 20 },
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/CatalogItem" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/trending": {
+      "get": {
+        "tags": ["Catalog Service"],
+        "summary": "Get Trending Media (Redis Cached)",
+        "description": "Returns top ranked media sorted by views and likes. Cached in Redis for 60 seconds.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["all", "video", "short", "music"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "source": { "type": "string", "example": "cache" },
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/CatalogItem" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/media/{id}": {
+      "get": {
+        "tags": ["Catalog Service"],
+        "summary": "Get Catalog Item Details",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CatalogItem" } }
+            }
+          },
+          "404": { "description": "Catalog item not found" }
+        }
+      }
+    },
+    "/api/v1/catalog/media/{id}/view": {
+      "post": {
+        "tags": ["Catalog Service"],
+        "summary": "Increment View Count",
+        "description": "Atomically increments the view counter in Redis and increments the counter in PostgreSQL.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "View recorded" },
+                    "id": { "type": "string" },
+                    "views": { "type": "integer", "example": 105 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/media/{id}/like": {
+      "post": {
+        "tags": ["Catalog Service"],
+        "summary": "Toggle Like / Unlike",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["user_id"],
+                "properties": {
+                  "user_id": { "type": "string", "example": "usr_998127391" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "liked": { "type": "boolean", "example": true }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/media/{id}/comments": {
+      "get": {
+        "tags": ["Catalog Service"],
+        "summary": "Get Comments for Media",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer", "example": 5 },
+                    "comments": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Comment" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Catalog Service"],
+        "summary": "Post a Comment",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["content"],
+                "properties": {
+                  "content": { "type": "string", "example": "Amazing video! Love the sound track." },
+                  "user_name": { "type": "string", "example": "Alex Rivers" },
+                  "user_id": { "type": "string" },
+                  "user_avatar": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Comment posted" },
+                    "comment": { "$ref": "#/components/schemas/Comment" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/sync": {
+      "post": {
+        "tags": ["Catalog Service"],
+        "summary": "Sync Media Item into Catalog",
+        "description": "Registers or updates a media record in the catalog database and flushes Redis feed caches.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CatalogItem" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Sync completed" },
+          "201": { "description": "Item created in catalog" }
+        }
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "tags": ["Search Service"],
+        "summary": "Search Media via OpenSearch",
+        "description": "Full-text search querying OpenSearch multi-match fields (`title^3`, `artist^2`, `tags^2`, `description`, `uploader_name`) with fuzziness `AUTO` and optional media type filtering.",
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string", "example": "lofi chill" } },
+          { "name": "type", "in": "query", "schema": { "type": "string", "enum": ["all", "video", "short", "music"] } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": { "type": "integer", "example": 8 },
+                    "took": { "type": "integer", "example": 4 },
+                    "page": { "type": "integer", "example": 1 },
+                    "limit": { "type": "integer", "example": 20 },
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Media" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/search/suggest": {
+      "get": {
+        "tags": ["Search Service"],
+        "summary": "Autocomplete Suggestions",
+        "description": "Fast as-you-type prefix suggestions powered by OpenSearch Edge N-Gram analyzers.",
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string", "example": "big" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 6 } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "suggestions": {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "example": ["Big Buck Bunny", "Big Waves Ambient", "Bigger Than Ever"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/search/index": {
+      "post": {
+        "tags": ["Search Service"],
+        "summary": "Index Media Document in OpenSearch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Media" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Document indexed successfully" }
+        }
+      }
+    },
+    "/api/v1/search/reindex": {
+      "post": {
+        "tags": ["Search Service"],
+        "summary": "Reindex All Media from Database",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Reindexing complete" },
+                    "indexed": { "type": "integer", "example": 25 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": ["Authentication & Users"],
+        "summary": "Register New User Account",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "email", "password"],
+                "properties": {
+                  "username": { "type": "string", "example": "streamer99" },
+                  "email": { "type": "string", "format": "email", "example": "streamer@streamly.io" },
+                  "password": { "type": "string", "format": "password", "example": "superSecret123" },
+                  "display_name": { "type": "string", "example": "Streamer NinetyNine" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } }
+            }
+          },
+          "409": { "description": "Username or email already taken" }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": ["Authentication & Users"],
+        "summary": "User Login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username_or_email", "password"],
+                "properties": {
+                  "username_or_email": { "type": "string", "example": "streamer@streamly.io" },
+                  "password": { "type": "string", "format": "password", "example": "superSecret123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } }
+            }
+          },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/api/v1/users/{id}": {
+      "get": {
+        "tags": ["Authentication & Users"],
+        "summary": "Get Public Channel Profile",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/User" } }
+            }
+          },
+          "404": { "description": "User not found" }
+        }
+      }
+    },
+    "/api/v1/users/me": {
+      "get": {
+        "tags": ["Authentication & Users"],
+        "summary": "Get Authenticated User Profile",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/User" } }
+            }
+          },
+          "401": { "description": "Unauthorized - Missing or invalid JWT" }
+        }
+      },
+      "put": {
+        "tags": ["Authentication & Users"],
+        "summary": "Update Profile Details",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "display_name": { "type": "string" },
+                  "bio": { "type": "string" },
+                  "avatar_url": { "type": "string" },
+                  "banner_url": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/User" } }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Media": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid", "example": "c1a9320e-6f81-4f11-9a40-3b4781423851" },
+          "title": { "type": "string", "example": "Big Buck Bunny - 4K Animated Film" },
+          "description": { "type": "string", "example": "The classic open-source 4K animation." },
+          "media_type": { "type": "string", "enum": ["video", "short", "music"], "example": "video" },
+          "artist": { "type": "string", "example": "Blender Foundation" },
+          "duration": { "type": "number", "format": "float", "example": 596.0 },
+          "stream_url": { "type": "string", "example": "/api/media/stream/c1a9320e-6f81-4f11-9a40-3b4781423851" },
+          "thumbnail_url": { "type": "string", "example": "/api/media/stream/c1a9320e-6f81-4f11-9a40-3b4781423851/thumbnail" },
+          "mime_type": { "type": "string", "example": "video/mp4" },
+          "file_size": { "type": "integer", "example": 158291040 },
+          "uploader_id": { "type": "string", "format": "uuid" },
+          "uploader_name": { "type": "string", "example": "Blender Foundation" },
+          "tags": { "type": "string", "example": "animation,4k,blender" },
+          "status": { "type": "string", "example": "ready" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CatalogItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "media_id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string", "example": "Synthesizer Sunset" },
+          "description": { "type": "string" },
+          "media_type": { "type": "string", "enum": ["video", "short", "music"] },
+          "artist": { "type": "string", "example": "Outrun 1984" },
+          "duration": { "type": "number", "example": 245 },
+          "stream_url": { "type": "string" },
+          "thumbnail_url": { "type": "string" },
+          "uploader_name": { "type": "string" },
+          "views": { "type": "integer", "example": 1420 },
+          "likes": { "type": "integer", "example": 234 },
+          "tags": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Comment": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "catalog_id": { "type": "string", "format": "uuid" },
+          "user_id": { "type": "string" },
+          "user_name": { "type": "string", "example": "Jordan Lee" },
+          "user_avatar": { "type": "string" },
+          "content": { "type": "string", "example": "The audio mixing in this song is phenomenal." },
+          "likes": { "type": "integer", "example": 4 },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "username": { "type": "string", "example": "streamer99" },
+          "email": { "type": "string", "example": "streamer@streamly.io" },
+          "display_name": { "type": "string", "example": "Streamer NinetyNine" },
+          "bio": { "type": "string", "example": "Creating daily music and video content." },
+          "avatar_url": { "type": "string" },
+          "banner_url": { "type": "string" },
+          "subscribers": { "type": "integer", "example": 1250 },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string", "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." },
+          "user": { "$ref": "#/components/schemas/User" }
+        }
+      }
+    }
+  }
+}

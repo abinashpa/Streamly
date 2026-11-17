@@ -1,0 +1,164 @@
+"""
+Streamly GraphQL Schema Definition Language (SDL)
+High-performance streaming platform schema for Videos, Shorts, and Music.
+"""
+
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+"""
+Media categorization filter enum
+"""
+enum MediaType {
+  ALL
+  VIDEO
+  SHORT
+  MUSIC
+}
+
+"""
+Core media entity representing a Video, Short Reel, or Audio Track
+"""
+type MediaItem {
+  id: ID!
+  title: String!
+  description: String
+  media_type: String!
+  artist: String
+  duration: Float
+  stream_url: String
+  thumbnail_url: String
+  uploader_id: String
+  uploader_name: String
+  tags: String
+  views: Int
+  likes: Int
+  created_at: String
+
+  """
+  Nested Resolver: Threaded comments associated with this media item
+  """
+  comments: [Comment!]
+
+  """
+  Nested Resolver: Channel profile of the media creator
+  """
+  uploader: User
+}
+
+"""
+User comment on a media item
+"""
+type Comment {
+  id: ID!
+  catalog_id: String
+  user_id: String
+  user_name: String
+  user_avatar: String
+  content: String!
+  likes: Int
+  created_at: String
+}
+
+"""
+Creator / User public channel profile
+"""
+type User {
+  id: ID!
+  username: String!
+  email: String
+  display_name: String
+  bio: String
+  avatar_url: String
+  banner_url: String
+  subscribers: Int
+  created_at: String
+}
+
+"""
+OpenSearch multi-field search results payload
+"""
+type SearchResult {
+  total: Int
+  took: Int
+  page: Int
+  limit: Int
+  items: [MediaItem]
+}
+
+"""
+Response payload for atomic view increment mutation
+"""
+type ViewPayload {
+  id: ID!
+  views: Int
+}
+
+"""
+Response payload for toggle like mutation
+"""
+type LikePayload {
+  liked: Boolean
+}
+
+"""
+Root Queries for fetching content across Streamly microservices
+"""
+type Query {
+  """
+  Retrieve paginated media feed items (cached in Redis with 45s TTL)
+  """
+  feed(type: MediaType = ALL, page: Int = 1, limit: Int = 20): [MediaItem!]!
+
+  """
+  Retrieve ranked trending media items sorted by views and likes (cached in Redis with 60s TTL)
+  """
+  trending(type: MediaType = ALL): [MediaItem!]!
+
+  """
+  Retrieve single media details by ID with nested comments and creator profile
+  """
+  media(id: ID!): MediaItem
+
+  """
+  Full-text search querying OpenSearch multi-match fields with fuzziness
+  """
+  search(query: String!, type: MediaType = ALL, page: Int = 1, limit: Int = 20): SearchResult!
+
+  """
+  Fast as-you-type prefix suggestions powered by OpenSearch Edge N-Gram analyzers
+  """
+  suggestions(query: String!, limit: Int = 6): [String!]!
+
+  """
+  Retrieve public channel profile by user ID or username
+  """
+  user(id: ID!): User
+
+  """
+  Retrieve profile of the currently authenticated user (requires Bearer token header)
+  """
+  me: User
+}
+
+"""
+Root Mutations for state modifications
+"""
+type Mutation {
+  """
+  Atomically increment the view counter for a media item in Redis and PostgreSQL
+  """
+  recordView(mediaId: ID!): ViewPayload!
+
+  """
+  Toggle like/unlike on a media item for a given user
+  """
+  toggleLike(mediaId: ID!, userId: String!): LikePayload!
+
+  """
+  Post a new comment on a media item thread
+  """
+  addComment(mediaId: ID!, content: String!, userName: String = "Streamly User"): Comment!
+}
