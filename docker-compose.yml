@@ -111,7 +111,7 @@ services:
   # ==========================================
   user-service:
     build:
-      context: ./services/user-service
+      context: https://github.com/abinashpa/Streamly-user-service.git
       dockerfile: Dockerfile
     container_name: streamly-user-service
     restart: unless-stopped
@@ -138,7 +138,7 @@ services:
   # ==========================================
   media-service:
     build:
-      context: ./services/media-service
+      context: https://github.com/abinashpa/Streamly-media-service.git
       dockerfile: Dockerfile
     container_name: streamly-media-service
     restart: unless-stopped
@@ -175,7 +175,7 @@ services:
   # ==========================================
   catalog-service:
     build:
-      context: ./services/catalog-service
+      context: https://github.com/abinashpa/Streamly-catalog-service.git
       dockerfile: Dockerfile
     container_name: streamly-catalog-service
     restart: unless-stopped
@@ -207,7 +207,7 @@ services:
   # ==========================================
   search-service:
     build:
-      context: ./services/search-service
+      context: https://github.com/abinashpa/Streamly-search-service.git
       dockerfile: Dockerfile
     container_name: streamly-search-service
     restart: unless-stopped
@@ -236,7 +236,7 @@ services:
   # ==========================================
   graphql-service:
     build:
-      context: ./services/graphql-service
+      context: https://github.com/abinashpa/Streamly-graphql-service.git
       dockerfile: Dockerfile
     container_name: streamly-graphql-service
     restart: unless-stopped
@@ -265,7 +265,7 @@ services:
   # ==========================================
   api-gateway:
     build:
-      context: ./services/api-gateway
+      context: https://github.com/abinashpa/Streamly-api-gateway.git
       dockerfile: Dockerfile
     container_name: streamly-api-gateway
     restart: unless-stopped
@@ -292,7 +292,7 @@ services:
   # ==========================================
   frontend:
     build:
-      context: ./frontend
+      context: https://github.com/abinashpa/Streamly-frontend.git
       dockerfile: Dockerfile
     container_name: streamly-frontend
     restart: unless-stopped

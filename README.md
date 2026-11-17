@@ -79,6 +79,22 @@ flowchart TD
 
 ---
 
+## 📦 Service Repositories
+
+Each microservice lives in its own repository for independent development, CI/CD, and deployment:
+
+| Service | Repository | Description |
+|---------|-----------|-------------|
+| 🖥️ **Frontend** | [Streamly-frontend](https://github.com/abinashpa/Streamly-frontend) | Next.js 14 + TypeScript + TailwindCSS + Prisma |
+| 🌐 **API Gateway** | [Streamly-api-gateway](https://github.com/abinashpa/Streamly-api-gateway) | Go + Gin reverse proxy & router (Port 8080) |
+| 🎬 **Media Service** | [Streamly-media-service](https://github.com/abinashpa/Streamly-media-service) | Upload, HTTP 206 range streaming, Kafka producer (Port 8081) |
+| 📋 **Catalog Service** | [Streamly-catalog-service](https://github.com/abinashpa/Streamly-catalog-service) | Feeds, interactions, Redis cache, Kafka consumer (Port 8082) |
+| 🔍 **Search Service** | [Streamly-search-service](https://github.com/abinashpa/Streamly-search-service) | OpenSearch-powered search & autocomplete (Port 8083) |
+| 👤 **User Service** | [Streamly-user-service](https://github.com/abinashpa/Streamly-user-service) | JWT auth & user profiles (Port 8084) |
+| 🔗 **GraphQL Service** | [Streamly-graphql-service](https://github.com/abinashpa/Streamly-graphql-service) | GraphQL federation & playground (Port 8085) |
+
+---
+
 ## 📁 Project Structure
 
 ```
